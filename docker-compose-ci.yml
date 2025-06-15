@@ -1,4 +1,18 @@
 services:
+    postgresdb:
+        image: postgres:14
+        container_name: postgresdb
+        restart: always
+        ports:
+          - 5432:5432
+        environment:
+          POSTGRES_DB: ems
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: sahil71495
+        volumes:
+          - postgres_data:/var/lib/postgresql/data/
+        networks:
+          - my-ems-network
     rabbitMQContainer:
         image: rabbitmq:4.1.0-management
         container_name: rabbitMQContainer
