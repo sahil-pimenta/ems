@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+	<property name="EMS_HOME" value="/app/data/logs" />
+
+<!-- 	<property name="EMS_HOME" value="D:/Stuff/Scrap/Eclipse-projects/Spring-Boot-EMS-Project/ems/logs" /> -->
+
+	<appender name="consoleAppender" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<pattern>
+				%d{dd-MM-yyyy HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg %n
+			</pattern>
+		</encoder>
+	</appender>
+
+	<appender name="fileAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${EMS_HOME}/ems_logs.log</file>
+	
+		<encoder>
+			<pattern>
+				%d{dd-MM-yyyy HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg %n
+			</pattern>
+		</encoder>
+		
+		<rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+			<fileNamePattern>${EMS_HOME}/ems_logs-%d{dd-MM-yyyy}.%i.log</fileNamePattern>
+			<maxFileSize>20MB</maxFileSize>
+			<maxHistory>20</maxHistory>
+		</rollingPolicy>
+	</appender>
+	
+	<appender name="logstashAppender" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>logstash:5044</destination>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
+    </appender>
+
+   <logger name="com.project.ems" level="DEBUG" additivity="false">
+		<appender-ref ref="fileAppender" />
+		<appender-ref ref="logstashAppender" />
+    </logger>
+    
+	<root level="INFO">
+		<appender-ref ref="consoleAppender" />
+		<appender-ref ref="fileAppender" />
+		<appender-ref ref="logstashAppender" />
+	</root>
+
+</configuration>
