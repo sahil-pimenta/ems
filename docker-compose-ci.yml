@@ -1,18 +1,4 @@
 services:
-    ems:
-        image: ems:1.0
-        container_name: ems
-        restart: always
-        ports:
-        - 8083:8083
-        depends_on:
-        - rabbitMQContainer
-        - redisContainer
-        - logstash
-        networks:
-        - my-ems-network
-        volumes:
-        - ems-data:/app/data/
     rabbitMQContainer:
         image: rabbitmq:4.1.0-management
         container_name: rabbitMQContainer
