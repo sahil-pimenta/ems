@@ -82,3 +82,5 @@ volumes:
         driver: local
     elastic_data:
         driver: local
+    postgres_data:
+        driver: local
