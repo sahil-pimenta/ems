@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+	<!-- For prod profile -->
+	<springProfile name="prod">
+		<property name="EMS_HOME" value="logs/" />
+	</springProfile>
+	
+	<!-- For dev profile -->
+	<springProfile name="dev">
+		<property name="EMS_HOME" value="logs/" />
+	</springProfile>
+
+	<!-- For docker profile -->
+	<springProfile name="docker">
+		<property name="EMS_HOME" value="/app/data/logs" />
+	</springProfile>
+	
+	<!-- For ci profile -->
+	<springProfile name="ci">
+		<property name="EMS_HOME" value="/app/data/logs" />
+	</springProfile>
+
+	<appender name="consoleAppender"
+		class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<pattern>
+				%d{dd-MM-yyyy HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg %n
+			</pattern>
+		</encoder>
+	</appender>
+
+	<appender name="fileAppender"
+		class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${EMS_HOME}/ems_logs.log</file>
+
+		<encoder>
+			<pattern>
+				%d{dd-MM-yyyy HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg %n
+			</pattern>
+		</encoder>
+
+		<rollingPolicy
+			class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+			<fileNamePattern>${EMS_HOME}/ems_logs-%d{dd-MM-yyyy}.%i.log
+			</fileNamePattern>
+			<maxFileSize>20MB</maxFileSize>
+			<maxHistory>20</maxHistory>
+		</rollingPolicy>
+	</appender>
+
+	<!-- For prod profile -->
+	<springProfile name="prod">
+		<appender name="logstashAppender"
+			class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+			<destination>localhost:5044</destination>
+			<encoder class="net.logstash.logback.encoder.LogstashEncoder" />
+		</appender>
+	</springProfile>
+
+	<!-- For dev profile -->
+	<springProfile name="dev">
+		<appender name="logstashAppender"
+			class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+			<destination>localhost:5044</destination>
+			<encoder class="net.logstash.logback.encoder.LogstashEncoder" />
+		</appender>
+	</springProfile>
+	
+	<!-- For docker profile -->
+	<springProfile name="docker">
+		<appender name="logstashAppender"
+			class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+			<destination>logstash:5044</destination>
+			<encoder class="net.logstash.logback.encoder.LogstashEncoder" />
+		</appender>
+	</springProfile>
+
+	<!-- For ci profile -->
+	<springProfile name="ci">
+		<appender name="logstashAppender"
+			class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+			<destination>logstash:5044</destination>
+			<encoder class="net.logstash.logback.encoder.LogstashEncoder" />
+		</appender>
+	</springProfile>
+
+	<logger name="com.project.ems" level="DEBUG" additivity="false">
+		<appender-ref ref="fileAppender" />
+		<appender-ref ref="logstashAppender" />
+	</logger>
+
+	<root level="INFO">
+		<appender-ref ref="consoleAppender" />
+		<appender-ref ref="fileAppender" />
+		<appender-ref ref="logstashAppender" />
+	</root>
+
+</configuration>

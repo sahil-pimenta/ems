@@ -1,0 +1,70 @@
+services:
+    rabbitMQContainer:
+        image: rabbitmq:4.1.0-management
+        container_name: rabbitMQContainer
+        restart: always
+        ports:
+        - 15672:15672
+        - 5672:5672
+        environment:
+        - RABBITMQ_DEFAULT_USER=sahil.p
+        - RABBITMQ_DEFAULT_PASS=sahil71495
+        networks:
+        - my-ems-network
+    redisContainer:
+        image: redis:8.0
+        container_name: redisContainer
+        restart: always
+        ports:
+        - 6379:6379
+        networks:
+        - my-ems-network
+    elasticsearch:
+        image: elasticsearch:8.17.1
+        container_name: elasticsearch
+        restart: always
+        volumes:
+          - elastic_data:/usr/share/elasticsearch/data/
+        environment:
+          - xpack.security.enabled=false  # Disable security for local development
+          - ES_JAVA_OPTS=-Xmx256m -Xms256m
+          - discovery.type=single-node
+        ports:
+          - '9200:9200'
+        networks:
+          - my-ems-network
+    logstash:
+        image: logstash:8.17.1
+        container_name: logstash
+        restart: always
+        volumes:
+          - ./logstash/:/logstash_dir
+        command: logstash -f /logstash_dir/pipeline/logstash.conf
+        depends_on:
+          - elasticsearch
+        ports:
+          - '5044:5044'
+        environment:
+          - LS_JAVA_OPTS=-Xmx256m -Xms256m
+        networks:
+          - my-ems-network
+    kibana:
+        image: kibana:8.17.1
+        container_name: kibana
+        restart: always
+        ports:
+          - '5601:5601'
+        environment:
+          - ELASTICSEARCH_URL=http://elasticsearch:9200
+        depends_on:
+          - elasticsearch
+        networks:
+          - my-ems-network
+networks:
+    my-ems-network:
+        driver: bridge
+volumes:
+    ems-data:
+        driver: local
+    elastic_data:
+        driver: local

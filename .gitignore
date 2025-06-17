@@ -41,3 +41,6 @@ build/
 # Build output
 /bin/
 /target/
+
+#logs
+logs/
