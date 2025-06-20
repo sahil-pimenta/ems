@@ -42,7 +42,7 @@ public class SpringSecurity
         
         //For JWT Authentication
         return http.authorizeHttpRequests(request -> request
-                .requestMatchers("/public/**","/swagger*/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/public/**","/swagger*/**", "/v3/api-docs/**","/actuator/","/actuator/**").permitAll()
                 .requestMatchers("/api/users/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
         .csrf(AbstractHttpConfigurer::disable) //please note that CSRF is disabled here

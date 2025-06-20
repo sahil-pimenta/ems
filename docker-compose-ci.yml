@@ -33,6 +33,46 @@ services:
         - 6379:6379
         networks:
         - my-ems-network
+    prometheus:
+        image: prom/prometheus:v3.4.1
+        container_name: prometheus
+        restart: always
+        command:
+        - --enable-feature=exemplar-storage
+        - --config.file=/etc/prometheus/prometheus.yml
+        volumes:
+        - ./docker/prometheus/docker/prometheus.yml:/etc/prometheus/prometheus.yml
+        ports:
+        - 9090:9090
+        networks:
+        - my-ems-network
+    tempo:
+        image: grafana/tempo:2.8.1
+        container_name: tempo
+        restart: always
+        command: ['-config.file=/etc/tempo.yaml']
+        volumes:
+        - ./docker/tempo/tempo.yml:/etc/tempo.yaml:ro
+        - ./docker/tempo/tempo-data:/tmp/tempo
+        ports:
+        - '3200:3200' # Tempo
+        - '9411:9411' # zipkin
+        networks:
+        - my-ems-network
+    grafana:
+        image: grafana/grafana:12.0.2
+        container_name: grafana
+        restart: always
+        volumes:
+        - ./docker/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+        environment:
+        - GF_AUTH_ANONYMOUS_ENABLED=true
+        - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+        - GF_AUTH_DISABLE_LOGIN_FORM=true
+        ports:
+        - '3000:3000'
+        networks:
+        - my-ems-network
     elasticsearch:
         image: elasticsearch:8.17.1
         container_name: elasticsearch
@@ -52,7 +92,7 @@ services:
         container_name: logstash
         restart: always
         volumes:
-          - ./logstash/:/logstash_dir
+          - ./docker/logstash/:/logstash_dir
         command: logstash -f /logstash_dir/pipeline/logstash.conf
         depends_on:
           - elasticsearch

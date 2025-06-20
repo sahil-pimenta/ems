@@ -1,0 +1,35 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    editable: false
+    jsonData:
+      httpMethod: POST
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+  - name: Tempo
+    type: tempo
+    access: proxy
+    orgId: 1
+    url: http://tempo:3200
+    basicAuth: false
+    isDefault: true
+    version: 1
+    editable: false
+    apiVersion: 1
+    uid: tempo
+    jsonData:
+      httpMethod: GET
+      nodeGraph:
+        enabled: true
+      tracesToMetrics:
+        datasourceUid: 'Prometheus'
+        spanStartTimeShift: '1m'
+        spanEndTimeShift: '1m'
+        tags: [{ key: 'service.name', value: 'app' }]
+      serviceMap:
+        datasourceUid: 'Prometheus'

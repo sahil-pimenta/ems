@@ -22,9 +22,13 @@ public class RedisConfig {
     @Value("${spring.redis.port}")
     private int redisPort;
     
+    @Value("${spring.zipkin.base-url}")
+    private String zipkinUrl;
+    
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
         log.error(">>> Creating LettuceConnectionFactory with host: " + redisHost + ", port: " + redisPort);
+        log.error("ZIPKIN URL>>"+zipkinUrl);
         return new LettuceConnectionFactory(redisHost, redisPort);
     }
     
