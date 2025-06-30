@@ -20,8 +20,11 @@ WORKDIR /app
 # Copy the JAR from the build stage to the runtime stage
 COPY --from=builder /app/target/ems-*.jar ems.jar
 
+# Copy the Elastic APM agent JAR
+COPY docker/elastic-apm-agent/elastic-apm-agent-1.54.0.jar /app/elastic-apm-agent-1.54.0.jar
+
 # Expose the port your Spring Boot app runs on (default is 8080 but I am setting it to 8083)
 EXPOSE 8083
 
 # Command to run the application
-ENTRYPOINT ["java", "-jar", "ems.jar"]
+ENTRYPOINT ["java", "-javaagent:/app/elastic-apm-agent-1.54.0.jar", "-jar", "ems.jar"]
