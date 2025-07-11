@@ -24,9 +24,11 @@ public class RabbitMQJsonConsumer {
 		log.debug("Received json msg>>"+usersDto.toString());
 	}
 	
-	@RabbitListener(queues = {"${rabbitmq.json.queue.name}"})
+	@RabbitListener(queues = {"${rabbitmq.email.queue.name}"})
 	public void getEmailMessage(MailDetailsDto mailDetailsDto)
 	{
+		System.out.println("Received email msg>>"+mailDetailsDto.toString());
+		log.debug("Received email msg>>"+mailDetailsDto.toString());
 		try {
 			int cc_len=0;
 			int bcc_len=0;

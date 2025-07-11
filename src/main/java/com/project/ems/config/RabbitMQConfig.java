@@ -32,6 +32,12 @@ public class RabbitMQConfig {
 	@Value("${rabbitmq.json.routing.key}")
 	private String jsonRoutingKey;
 	
+	@Value("${rabbitmq.email.queue.name}")
+	private String emailQueueName;
+	
+	@Value("${rabbitmq.email.routing.key}")
+	private String emailRoutingKey;
+	
 	//Spring bean for rabbitmq queue
 	@Bean
 	public Queue queue()
@@ -43,6 +49,12 @@ public class RabbitMQConfig {
 	public Queue jsonQueue()
 	{
 		return new Queue(jsonQueueName);
+	}
+	
+	@Bean
+	public Queue emailQueue()
+	{
+		return new Queue(emailQueueName);
 	}
 	
 	//Spring bean for rabbitmq exchange
@@ -69,6 +81,15 @@ public class RabbitMQConfig {
 				.bind(jsonQueue())
 				.to(exchange())
 				.with(jsonRoutingKey);
+	}
+	
+	@Bean
+	public Binding emailBinding()
+	{
+		return BindingBuilder
+				.bind(emailQueue())
+				.to(exchange())
+				.with(emailRoutingKey);
 	}
 	
 	@Bean

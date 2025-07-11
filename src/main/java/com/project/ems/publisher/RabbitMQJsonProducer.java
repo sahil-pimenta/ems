@@ -21,6 +21,9 @@ public class RabbitMQJsonProducer {
 	@Value("${rabbitmq.json.routing.key}")
 	private String jsonRoutingKey;
 	
+	@Value("${rabbitmq.email.routing.key}")
+	private String emailRoutingKey;
+	
 	@Autowired
 	private RabbitTemplate rabbitTemplate;
 	
@@ -32,6 +35,6 @@ public class RabbitMQJsonProducer {
 	
 	public void sendEmail(MailDetailsDto mailDetailsDto)
 	{
-		rabbitTemplate.convertAndSend(exchange, jsonRoutingKey, mailDetailsDto);
+		rabbitTemplate.convertAndSend(exchange, emailRoutingKey, mailDetailsDto);
 	}
 }
