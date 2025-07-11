@@ -1,110 +1,295 @@
-services:
-    rabbitMQContainer:
-        image: rabbitmq:4.1.0-management
-        container_name: rabbitMQContainer
-        restart: always
-        ports:
-        - 15672:15672
-        - 5672:5672
-        environment:
-        - RABBITMQ_DEFAULT_USER=sahil.p
-        - RABBITMQ_DEFAULT_PASS=sahil71495
-        networks:
-        - my-ems-network
-    redisContainer:
-        image: redis:8.0
-        container_name: redisContainer
-        restart: always
-        ports:
-        - 6379:6379
-        networks:
-        - my-ems-network
-    prometheus:
-        image: prom/prometheus:v3.4.1
-        container_name: prometheus
-        restart: always
-        command:
-        - --enable-feature=exemplar-storage
-        - --config.file=/etc/prometheus/prometheus.yml
-        volumes:
-        - ./docker/prometheus/dev/prometheus.yml:/etc/prometheus/prometheus.yml
-        ports:
-        - 9090:9090
-        networks:
-        - my-ems-network
-    tempo:
-        image: grafana/tempo:2.8.1
-        container_name: tempo
-        restart: always
-        command: ['-config.file=/etc/tempo.yaml']
-        volumes:
-        - ./docker/tempo/tempo.yml:/etc/tempo.yaml:ro
-        - ./docker/tempo/tempo-data:/tmp/tempo
-        ports:
-        - '3200:3200' # Tempo
-        - '9411:9411' # zipkin
-        networks:
-        - my-ems-network
-    grafana:
-        image: grafana/grafana:12.0.2
-        container_name: grafana
-        restart: always
-        volumes:
-        - ./docker/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
-        environment:
-        - GF_AUTH_ANONYMOUS_ENABLED=true
-        - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-        - GF_AUTH_DISABLE_LOGIN_FORM=true
-        ports:
-        - '3000:3000'
-        networks:
-        - my-ems-network
-    elasticsearch:
-        image: elasticsearch:8.17.1
-        container_name: elasticsearch
-        restart: always
-        volumes:
-          - elastic_data:/usr/share/elasticsearch/data/
-        environment:
-          - xpack.security.enabled=false  # Disable security for local development
-          - ES_JAVA_OPTS=-Xmx256m -Xms256m
-          - discovery.type=single-node
-        ports:
-          - '9200:9200'
-        networks:
-          - my-ems-network
-    logstash:
-        image: logstash:8.17.1
-        container_name: logstash
-        restart: always
-        volumes:
-          - ./docker/logstash/:/logstash_dir
-        command: logstash -f /logstash_dir/pipeline/logstash.conf
-        depends_on:
-          - elasticsearch
-        ports:
-          - '5044:5044'
-        environment:
-          - LS_JAVA_OPTS=-Xmx256m -Xms256m
-        networks:
-          - my-ems-network
-    kibana:
-        image: kibana:8.17.1
-        container_name: kibana
-        restart: always
-        ports:
-          - '5601:5601'
-        environment:
-          - ELASTICSEARCH_URL=http://elasticsearch:9200
-        depends_on:
-          - elasticsearch
-        networks:
-          - my-ems-network
+volumes:
+  certs:
+    driver: local
+  esdata01:
+    driver: local
+  kibanadata:
+    driver: local
+  logstashdata01:
+    driver: local
+  ems-data:
+    driver: local
+  fleetserverdata:
+    driver: local
+    
 networks:
     my-ems-network:
         driver: bridge
-volumes:
-    ems-data:
-        driver: local
-    elastic_data:
-        driver: local
+        
+services:
+  elk-cert-setup:
+    image: elasticsearch:${STACK_VERSION}
+    volumes:
+      - certs:/usr/share/elasticsearch/config/certs
+    user: "0"
+    command: >
+      bash -c '
+        if [ x${ELASTIC_PASSWORD} == x ]; then
+          echo "Set the ELASTIC_PASSWORD environment variable in the .env file";
+          exit 1;
+        elif [ x${KIBANA_PASSWORD} == x ]; then
+          echo "Set the KIBANA_PASSWORD environment variable in the .env file";
+          exit 1;
+        fi;
+        if [ ! -f config/certs/ca.zip ]; then
+          echo "Creating CA";
+          bin/elasticsearch-certutil ca --silent --pem -out config/certs/ca.zip;
+          unzip config/certs/ca.zip -d config/certs;
+        fi;
+        if [ ! -f config/certs/certs.zip ]; then
+          echo "Creating certs";
+          echo -ne \
+          "instances:\n"\
+          "  - name: es01\n"\
+          "    dns:\n"\
+          "      - es01\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          "  - name: kibana\n"\
+          "    dns:\n"\
+          "      - kibana\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          "  - name: fleet-server\n"\
+          "    dns:\n"\
+          "      - fleet-server\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          > config/certs/instances.yml;
+          bin/elasticsearch-certutil cert --silent --pem -out config/certs/certs.zip --in config/certs/instances.yml --ca-cert config/certs/ca/ca.crt --ca-key config/certs/ca/ca.key;
+          unzip config/certs/certs.zip -d config/certs;
+        fi;
+        echo "Setting file permissions"
+        chown -R root:root config/certs;
+        find . -type d -exec chmod 750 \{\} \;;
+        find . -type f -exec chmod 640 \{\} \;;
+        echo "Waiting for Elasticsearch availability";
+        until curl -s -o /dev/null -w "%{http_code}" --cacert config/certs/ca/ca.crt https://es01:9200 | grep -q "401"; do
+        echo "Waiting for Elasticsearch to become available..."; sleep 5;
+        done;
+        echo "Setting kibana_system password";
+        until curl -s -X POST --cacert config/certs/ca/ca.crt -u "elastic:${ELASTIC_PASSWORD}" -H "Content-Type: application/json" https://es01:9200/_security/user/kibana_system/_password -d "{\"password\":\"${KIBANA_PASSWORD}\"}" | grep -q "^{}"; do sleep 10; done;
+        echo "All done!";
+        touch config/certs/kibana_ready.flag
+      '
+    networks:
+    - my-ems-network
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f config/certs/es01/es01.crt ]"]
+      interval: 1s
+      timeout: 5s
+      retries: 120
+  es01:
+    depends_on:
+      elk-cert-setup:
+        condition: service_healthy
+    image: elasticsearch:${STACK_VERSION}
+    restart: always
+    labels:
+      co.elastic.logs/module: elasticsearch
+    volumes:
+      - certs:/usr/share/elasticsearch/config/certs
+      - esdata01:/usr/share/elasticsearch/data
+    ports:
+      - ${ES_PORT}:9200
+    environment:
+      - node.name=es01
+      - cluster.name=${CLUSTER_NAME}
+      - discovery.type=single-node
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.key=certs/es01/es01.key
+      - xpack.security.http.ssl.certificate=certs/es01/es01.crt
+      - xpack.security.http.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/es01/es01.key
+      - xpack.security.transport.ssl.certificate=certs/es01/es01.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.license.self_generated.type=${LICENSE}
+    networks:
+    - my-ems-network
+    mem_limit: ${ES_MEM_LIMIT}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s --cacert config/certs/ca/ca.crt https://localhost:9200 | grep -q 'missing authentication credentials'",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+  kibana:
+    depends_on:
+      es01:
+        condition: service_healthy
+    image: kibana:${STACK_VERSION}
+    restart: always
+    labels:
+      co.elastic.logs/module: kibana
+    volumes:
+      - certs:/usr/share/kibana/config/certs
+      - kibanadata:/usr/share/kibana/data
+      - ./docker/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+    ports:
+      - ${KIBANA_PORT}:5601
+    environment:
+      - SERVERNAME=kibana
+      - ELASTICSEARCH_HOSTS=https://es01:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
+      - ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES=config/certs/ca/ca.crt
+      - XPACK_SECURITY_ENCRYPTIONKEY=${ENCRYPTION_KEY}
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=${ENCRYPTION_KEY}
+      - XPACK_REPORTING_ENCRYPTIONKEY=${ENCRYPTION_KEY}
+      - XPACK_REPORTING_KIBANASERVER_HOSTNAME=localhost
+      - SERVER_SSL_ENABLED=true
+      - SERVER_SSL_CERTIFICATE=config/certs/kibana/kibana.crt
+      - SERVER_SSL_KEY=config/certs/kibana/kibana.key
+      - SERVER_SSL_CERTIFICATEAUTHORITIES=config/certs/ca/ca.crt
+      - ELASTIC_APM_SECRET_TOKEN=${ELASTIC_APM_SECRET_TOKEN}
+    networks:
+    - my-ems-network
+    mem_limit: ${KB_MEM_LIMIT}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -I -s --cacert config/certs/ca/ca.crt https://localhost:5601 | grep -q 'HTTP/1.1 302 Found'",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+  logstash:
+    depends_on:
+      es01:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy
+    image: logstash:${STACK_VERSION}
+    container_name: logstash
+    restart: always
+    labels:
+      co.elastic.logs/module: logstash
+    user: root
+    volumes:
+      - certs:/usr/share/logstash/certs
+      - logstashdata01:/usr/share/logstash/data
+      - "./docker/logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
+    command: logstash -f /usr/share/logstash/pipeline/logstash.conf
+    ports:
+    - '5044:5044'
+    environment:
+      - xpack.monitoring.enabled=false
+      - ELASTIC_USER=elastic
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - ELASTIC_HOSTS=https://es01:9200
+    networks:
+    - my-ems-network
+  fleet-server:
+    depends_on:
+      kibana:
+        condition: service_healthy
+      es01:
+        condition: service_healthy
+    image: docker.elastic.co/beats/elastic-agent:${STACK_VERSION}
+    volumes:
+      - certs:/certs
+      - fleetserverdata:/usr/share/elastic-agent
+      - "/var/lib/docker/containers:/var/lib/docker/containers:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "/sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro"
+      - "/proc:/hostfs/proc:ro"
+      - "/:/hostfs:ro"
+    ports:
+      - ${FLEET_PORT}:8220
+      - ${APMSERVER_PORT}:8200
+    user: root
+    environment:
+      - SSL_CERTIFICATE_AUTHORITIES=/certs/ca/ca.crt
+      - CERTIFICATE_AUTHORITIES=/certs/ca/ca.crt
+      - FLEET_CA=/certs/ca/ca.crt
+      - FLEET_ENROLL=1
+      - FLEET_SERVER_ELASTICSEARCH_CA=/certs/ca/ca.crt
+      - FLEET_SERVER_ELASTICSEARCH_HOST=https://es01:9200
+      - FLEET_SERVER_ENABLE=1
+      - FLEET_SERVER_CERT=/certs/fleet-server/fleet-server.crt
+      - FLEET_SERVER_CERT_KEY=/certs/fleet-server/fleet-server.key
+      - FLEET_SERVER_POLICY_ID=fleet-server-policy
+      - FLEET_URL=https://fleet-server:8220
+      - KIBANA_FLEET_CA=/certs/ca/ca.crt
+      - KIBANA_FLEET_SETUP=1
+      - KIBANA_FLEET_USERNAME=elastic
+      - KIBANA_FLEET_PASSWORD=${ELASTIC_PASSWORD}
+      - KIBANA_HOST=https://kibana:5601
+    networks:
+    - my-ems-network
+  rabbitMQContainer:
+    image: rabbitmq:4.1.0-management
+    container_name: rabbitMQContainer
+    restart: always
+    ports:
+    - 15672:15672
+    - 5672:5672
+    environment:
+    - RABBITMQ_DEFAULT_USER=sahil.p
+    - RABBITMQ_DEFAULT_PASS=sahil71495
+    networks:
+    - my-ems-network
+  redisContainer:
+    image: redis:8.0
+    container_name: redisContainer
+    restart: always
+    ports:
+    - 6379:6379
+    networks:
+    - my-ems-network
+  prometheus:
+    image: prom/prometheus:v3.4.1
+    container_name: prometheus
+    restart: always
+    command:
+    - --enable-feature=exemplar-storage
+    - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+    - ./docker/prometheus/docker/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+    - 9090:9090
+    networks:
+    - my-ems-network
+  tempo:
+    image: grafana/tempo:2.8.1
+    container_name: tempo
+    restart: always
+    command: ['-config.file=/etc/tempo.yaml']
+    volumes:
+    - ./docker/tempo/tempo.yml:/etc/tempo.yaml:ro
+    - ./docker/tempo/tempo-data:/tmp/tempo
+    ports:
+    - '3200:3200' # Tempo
+    - '9411:9411' # zipkin
+    networks:
+    - my-ems-network
+  grafana:
+    image: grafana/grafana:12.0.2
+    container_name: grafana
+    restart: always
+    volumes:
+    - ./docker/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    environment:
+    - GF_AUTH_ANONYMOUS_ENABLED=true
+    - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    - GF_AUTH_DISABLE_LOGIN_FORM=true
+    ports:
+    - '3000:3000'
+    networks:
+    - my-ems-network

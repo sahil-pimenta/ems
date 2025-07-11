@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.project.ems.dto.MailDetailsDto;
 import com.project.ems.dto.UsersDto;
 
 import lombok.AllArgsConstructor;
@@ -27,5 +28,10 @@ public class RabbitMQJsonProducer {
 	public void sendJsonMsg(UsersDto usersDto)
 	{
 		rabbitTemplate.convertAndSend(exchange, jsonRoutingKey, usersDto);
+	}
+	
+	public void sendEmail(MailDetailsDto mailDetailsDto)
+	{
+		rabbitTemplate.convertAndSend(exchange, jsonRoutingKey, mailDetailsDto);
 	}
 }

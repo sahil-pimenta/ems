@@ -1,5 +1,6 @@
 package com.project.ems.controller;
 
+import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,16 +17,20 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.project.ems.dto.EmployeeDto;
+import com.project.ems.dto.MailDetailsDto;
 import com.project.ems.dto.UsersDto;
 import com.project.ems.publisher.RabbitMQJsonProducer;
 import com.project.ems.publisher.RabbitMQProducer;
+import com.project.ems.service.EmailService;
 import com.project.ems.service.EmployeeService;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
+@Slf4j
 @AllArgsConstructor
 @NoArgsConstructor
 @Tag(name="Employee APIs", description = "CRUD operations")
@@ -41,11 +46,21 @@ public class EmployeeController {
 	@Autowired
 	private RabbitMQJsonProducer rabbitMQJsonProducer;
 	
+	@Autowired
+	private EmailService emailService;
+	
 	//Add Employee REST API
 	@PostMapping("/add-employee")
 	public ResponseEntity<EmployeeDto> createEmpolyee(@RequestBody EmployeeDto employeeDto)
 	{
 		EmployeeDto savedEmployeeDto = employeeService.createEmployee(employeeDto);
+		
+		rabbitMQJsonProducer.sendEmail(MailDetailsDto.builder()
+				.to(savedEmployeeDto.getEmail())
+				.cc(Arrays.asList("sahil.pimenta@softwareworkshop.net"))
+				.mailType("WELCOME_MAIL")
+				.build());
+		
 		return new ResponseEntity<EmployeeDto>(savedEmployeeDto, HttpStatus.CREATED);
 	}
 	
