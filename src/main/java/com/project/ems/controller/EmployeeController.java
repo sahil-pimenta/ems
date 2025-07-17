@@ -21,7 +21,6 @@ import com.project.ems.dto.MailDetailsDto;
 import com.project.ems.dto.UsersDto;
 import com.project.ems.publisher.RabbitMQJsonProducer;
 import com.project.ems.publisher.RabbitMQProducer;
-import com.project.ems.service.EmailService;
 import com.project.ems.service.EmployeeService;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -46,9 +45,6 @@ public class EmployeeController {
 	@Autowired
 	private RabbitMQJsonProducer rabbitMQJsonProducer;
 	
-	@Autowired
-	private EmailService emailService;
-	
 	//Add Employee REST API
 	@PostMapping("/add-employee")
 	public ResponseEntity<EmployeeDto> createEmpolyee(@RequestBody EmployeeDto employeeDto)
@@ -56,9 +52,9 @@ public class EmployeeController {
 		EmployeeDto savedEmployeeDto = employeeService.createEmployee(employeeDto);
 		
 		rabbitMQJsonProducer.sendEmail(MailDetailsDto.builder()
-				.to(savedEmployeeDto.getEmail())
+				.to(Arrays.asList(savedEmployeeDto.getEmail()))
 				.cc(Arrays.asList("sahil.pimenta@softwareworkshop.net"))
-				.mailType("WELCOME_MAIL")
+				.mailTemplate("WELCOME_MAIL")
 				.build());
 		
 		return new ResponseEntity<EmployeeDto>(savedEmployeeDto, HttpStatus.CREATED);

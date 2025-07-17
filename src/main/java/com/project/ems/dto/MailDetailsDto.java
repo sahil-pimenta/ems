@@ -13,8 +13,8 @@ import lombok.NoArgsConstructor;
 @Builder
 public class MailDetailsDto {
 
-	public String to;
+	public List<String> to;
 	public List<String> cc;
 	public List<String> bcc;
-	public String mailType;
+	public String mailTemplate;
 }

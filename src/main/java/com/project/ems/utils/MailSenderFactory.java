@@ -36,7 +36,7 @@ public class MailSenderFactory {
     	
         JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
         
-    	if(StringUtils.equalsIgnoreCase(fromProfile, "id1"))
+    	if(StringUtils.equalsIgnoreCase(fromProfile, "DEFAULT"))
     	{
             mailSender.setHost(id1_mail_host);
             mailSender.setPort(Integer.parseInt(id1_mail_port));
@@ -63,4 +63,15 @@ public class MailSenderFactory {
         return mailSender;
     }
     
+    public String getFromEmail(String fromProfile)
+    {
+    	if(StringUtils.equalsIgnoreCase(fromProfile, "DEFAULT"))
+    	{
+    		return id1_mail_username;
+    	}
+    	else
+    	{
+    		return id1_mail_username;
+    	}
+    }
 }

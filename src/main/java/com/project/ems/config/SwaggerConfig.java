@@ -31,7 +31,8 @@ public class SwaggerConfig {
 								new Tag().name("Public APIs"),
 								new Tag().name("User APIs"),
 								new Tag().name("Employee APIs"),
-								new Tag().name("Weather APIs")
+								new Tag().name("Weather APIs"),
+								new Tag().name("Email APIs")
 								))
 				.addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                 .components(new Components().addSecuritySchemes(
